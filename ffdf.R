@@ -89,6 +89,7 @@ x<-read.csv.ffdf(file=sample,
                  colClasses=c(rep("character", 41)))
 
 ######################################################################################
+##Getting Column Names
 file_in <- file(big,"r")
 file_out <- file("out.csv","a")
 x <- readLines(file_in, n=1)
@@ -97,12 +98,12 @@ x <- readLines(file_in, n=1)
 names<-unlist(strsplit(x, split="\t"))
 
 
+########################################
+####Getting the data - need to find a way to loop it sensibly or a function
 x2 <- readLines(file_in, n=3000000)
-#sub2<-gsub("\t", " ",x2)
-#sub2[2:length(sub2)]
 test<-strsplit(x2, split="\t")
 forty<-function(row){
-  rowf<-row[1:40]
+  rowf<-row[1:40]    #only first 40 cols are there consistently so chucking any after this to make formatting simpler
   return(rowf)
 }
 
@@ -122,15 +123,48 @@ plot(xy)
 nrow(dm)
 
 toucan<-readOGR(dsn="C:/Users/Fiona/Documents/BirdLife/IUCN/species_22727999/species_22727999", layer= "species_22727999")
-plot(toucan, col="grey")
-points(xy, col="red")
 
 xy<-matrix(as.numeric(xy), ncol=2)
-xy<-SpatialPoints(xy)
+xysp<-SpatialPoints(xy)
 
-crs(xy)<-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0 "
+crs(xysp)<-"+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0 "
 
-over(xy, toucan)
+plot(toucan, col="grey")
+points(xysp, col="red")
+
+io<-over(xysp, toucan)
+
+
+spdf<-data.frame(cbind(xy, io$ID_NO))
+spdf$X3[is.na(spdf$X3)]<-0
+sum(spdf$X3)/nrow(spdf)
+
+plot(spdf$X1, spdf$X2, col=spdf$X3)
+
+tdf<-fortify(toucan)
+library(ggplot2)
+p<-ggplot()+
+    geom_polygon(data=tdf, aes(x=long, y=lat,  group=group), fill="light grey")+
+    geom_point(data=spdf, aes(x=X1, y=X2, colour=X3))+
+    theme_bw()
+p
+
+install.packages("rgeos")
+library(rgeos)
+
+xym <- spTransform(xysp, CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"))
+tcm <- spTransform(toucan, CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"))
+
+
+
+apply(gDistance(xym, tcm,byid=TRUE),2,min)
+
+gDistance(xysp,toucan)
+
+
+
+close(file_in)
+close(file_out)
 
 
 
@@ -144,9 +178,6 @@ while(length(sub)) {
   if (length(ind)) writeLines(x[ind], file_out)
   sub <- readLines(file_in, n=B)
 }
-close(file_in)
-close(file_out)
-
 
 
 
